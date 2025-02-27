@@ -6,17 +6,16 @@ import time
 import pygetwindow as gw
 import pyautogui
 
-# Глобальный список строк
 global_strings = ["Пример строки 1", "Пример строки 2", "Пример строки 3"]
 
 class StringListApp:
-    def __init__(self, root, previous_window):
+    def __init__(self, root):
         self.root = root
-        self.previous_window = previous_window  # Запоминаем предыдущее активное окно
+        self.previous_window = None
         self.root.title("String List")
         self.root.geometry("400x300")
-        self.root.attributes("-topmost", True)
-
+        self.root.bind('<Escape>', lambda e: self.hide_window())
+        
         self.strings = global_strings
         self.filtered_strings = self.strings.copy()
 
@@ -25,7 +24,7 @@ class StringListApp:
 
         self.entry = ttk.Entry(root, textvariable=self.filter_var)
         self.entry.pack(pady=10, padx=10, fill=tk.X)
-        self.entry.focus()  # Устанавливаем фокус на поле ввода
+        self.entry.focus()
 
         self.listbox = tk.Listbox(root)
         self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -111,36 +110,49 @@ class StringListApp:
         selected = self.listbox.curselection()
         if selected:
             selected_string = self.filtered_strings[selected[0]]
-            pyperclip.copy(selected_string)  # Копируем в буфер обмена
-            self.root.destroy()
-            time.sleep(0.1)  # Короткая пауза для переключения фокуса
+            pyperclip.copy(selected_string)
+            self.hide_window()
+            time.sleep(0.1)
             if self.previous_window:
                 self.previous_window.activate()
-                keyboard.press_and_release("ctrl+v")  # Вставка через Ctrl+V
+                keyboard.press_and_release("ctrl+v")
+
+    def hide_window(self):
+        self.root.withdraw()
+        if self.previous_window:
+            try:
+                self.previous_window.activate()
+            except Exception as e:
+                print(f"Ошибка при активации окна: {e}")
+
+    def show(self, previous_window, x, y):
+        self.previous_window = previous_window
+        self.root.geometry(f"+{x}+{y}")
+        self.root.deiconify()
+        self.root.attributes("-topmost", True)
+        self.root.lift()
+        self.root.focus_force()
+        self.entry.focus()
+
+# Глобальная переменная для хранения экземпляра приложения
+app_instance = None
 
 def show_window():
-    previous_window = gw.getActiveWindow()  # Запоминаем активное окно
-    root = tk.Tk()
-    
-    # Получаем текущие координаты курсора
+    global app_instance
+    previous_window = gw.getActiveWindow()
     x, y = pyautogui.position()
     
-    # Устанавливаем позицию окна рядом с курсором
-    root.geometry(f"+{x}+{y}")
-    
-    # Принудительно поднимаем окно и устанавливаем фокус
-    root.lift()
-    root.focus_force()
-    
-    # Добавляем небольшую задержку для гарантии фокуса
-    root.after(100, lambda: root.focus_force())
-    
-    app = StringListApp(root, previous_window)
-    
-    # Устанавливаем фокус на поле ввода через небольшую задержку
-    root.after(100, lambda: app.entry.focus())
-    
-    root.mainloop()
+    if app_instance is None or not app_instance.root.winfo_exists():
+        root = tk.Toplevel()
+        app_instance = StringListApp(root)
+    app_instance.show(previous_window, x, y)
 
+# Создаем скрытое главное окно
+main_root = tk.Tk()
+main_root.withdraw()
+
+# Регистрируем горячую клавишу
 keyboard.add_hotkey("ctrl+alt+s", show_window)
-keyboard.wait("esc")
+
+# Запускаем главный цикл Tkinter
+main_root.mainloop()
