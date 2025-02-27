@@ -4,6 +4,7 @@ import keyboard
 import pyperclip
 import time
 import pygetwindow as gw
+import pyautogui
 
 # Глобальный список строк
 global_strings = ["Пример строки 1", "Пример строки 2", "Пример строки 3"]
@@ -24,7 +25,7 @@ class StringListApp:
 
         self.entry = ttk.Entry(root, textvariable=self.filter_var)
         self.entry.pack(pady=10, padx=10, fill=tk.X)
-        self.entry.focus()
+        self.entry.focus()  # Устанавливаем фокус на поле ввода
 
         self.listbox = tk.Listbox(root)
         self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -120,7 +121,25 @@ class StringListApp:
 def show_window():
     previous_window = gw.getActiveWindow()  # Запоминаем активное окно
     root = tk.Tk()
+    
+    # Получаем текущие координаты курсора
+    x, y = pyautogui.position()
+    
+    # Устанавливаем позицию окна рядом с курсором
+    root.geometry(f"+{x}+{y}")
+    
+    # Принудительно поднимаем окно и устанавливаем фокус
+    root.lift()
+    root.focus_force()
+    
+    # Добавляем небольшую задержку для гарантии фокуса
+    root.after(100, lambda: root.focus_force())
+    
     app = StringListApp(root, previous_window)
+    
+    # Устанавливаем фокус на поле ввода через небольшую задержку
+    root.after(100, lambda: app.entry.focus())
+    
     root.mainloop()
 
 keyboard.add_hotkey("ctrl+alt+s", show_window)
