@@ -4,28 +4,29 @@ import keyboard
 import pyperclip
 import time
 import pygetwindow as gw
+from pygetwindow import Win32Window
 import pyautogui
+from typing import Optional, List
 
-# Глобальный список строк
-global_strings = ["Пример строки 1", "Пример строки 2", "Пример строки 3"]
+global_strings: List[str] = ["Пример строки 1", "Пример строки 2", "Пример строки 3"]
 
 class StringListApp:
-    def __init__(self, root, previous_window):
+    def __init__(self, root: tk.Tk):
         self.root = root
-        self.previous_window = previous_window  # Запоминаем предыдущее активное окно
         self.root.title("String List")
         self.root.geometry("400x300")
         self.root.attributes("-topmost", True)
-
-        self.strings = global_strings
-        self.filtered_strings = self.strings.copy()
+        
+        self.strings: List[str] = global_strings
+        self.filtered_strings: List[str] = self.strings.copy()
+        self.previous_window: Optional[Win32Window] = None
+        self.editing_index: Optional[int] = None
 
         self.filter_var = tk.StringVar()
         self.filter_var.trace("w", self.update_list)
 
         self.entry = ttk.Entry(root, textvariable=self.filter_var)
         self.entry.pack(pady=10, padx=10, fill=tk.X)
-        self.entry.focus()  # Устанавливаем фокус на поле ввода
 
         self.listbox = tk.Listbox(root)
         self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -48,17 +49,16 @@ class StringListApp:
 
         self.listbox.bind("<Return>", self.insert_string)
         self.listbox.bind("<Double-Button-1>", self.insert_string)
+        self.root.bind("<Escape>", self.hide_window)
 
-        self.editing_index = None
-
-    def update_list(self, *args):
+    def update_list(self, *args: tk.Event) -> None:
         filter_text = self.filter_var.get().lower()
         self.filtered_strings = [s for s in self.strings if filter_text in s.lower()]
         self.listbox.delete(0, tk.END)
         for s in self.filtered_strings:
             self.listbox.insert(tk.END, s)
 
-    def add_string(self):
+    def add_string(self) -> None:
         new_string = self.filter_var.get().strip()
         if new_string and new_string not in self.strings:
             self.strings.append(new_string)
@@ -66,7 +66,7 @@ class StringListApp:
             self.filter_var.set("")
             self.entry.focus()
 
-    def edit_string(self):
+    def edit_string(self) -> None:
         selected = self.listbox.curselection()
         if selected:
             self.add_button.pack_forget()
@@ -78,17 +78,17 @@ class StringListApp:
             self.filter_var.set(self.strings[self.editing_index])
             self.entry.focus()
 
-    def save_edit(self):
+    def save_edit(self) -> None:
         if self.editing_index is not None:
             new_string = self.filter_var.get().strip()
             if new_string and new_string not in self.strings:
                 self.strings[self.editing_index] = new_string
             self.cleanup_edit()
 
-    def cancel_edit(self):
+    def cancel_edit(self) -> None:
         self.cleanup_edit()
 
-    def cleanup_edit(self):
+    def cleanup_edit(self) -> None:
         self.ok_button.pack_forget()
         self.cancel_button.pack_forget()
         self.add_button.pack(side=tk.LEFT, padx=5)
@@ -99,7 +99,7 @@ class StringListApp:
         self.editing_index = None
         self.entry.focus()
 
-    def delete_string(self):
+    def delete_string(self) -> None:
         selected = self.listbox.curselection()
         if selected:
             selected_string = self.filtered_strings[selected[0]]
@@ -107,40 +107,41 @@ class StringListApp:
             self.update_list()
             self.entry.focus()
 
-    def insert_string(self, event):
+    def insert_string(self, event: Optional[tk.Event] = None) -> None:
         selected = self.listbox.curselection()
         if selected:
             selected_string = self.filtered_strings[selected[0]]
-            pyperclip.copy(selected_string)  # Копируем в буфер обмена
-            self.root.destroy()
-            time.sleep(0.1)  # Короткая пауза для переключения фокуса
+            pyperclip.copy(selected_string)
+            self.hide_window()
+            time.sleep(0.1)
             if self.previous_window:
-                self.previous_window.activate()
-                keyboard.press_and_release("ctrl+v")  # Вставка через Ctrl+V
+                try:
+                    self.previous_window.activate()
+                    keyboard.press_and_release("ctrl+v")
+                except Exception as e:
+                    print(f"Ошибка активации окна: {e}")
 
-def show_window():
-    previous_window = gw.getActiveWindow()  # Запоминаем активное окно
-    root = tk.Tk()
-    
-    # Получаем текущие координаты курсора
+    def hide_window(self, event: Optional[tk.Event] = None) -> None:
+        self.root.withdraw()
+        if self.previous_window:
+            try:
+                self.previous_window.activate()
+            except Exception as e:
+                print(f"Ошибка активации предыдущего окна: {e}")
+
+def show_window() -> None:
+    app.previous_window = gw.getActiveWindow()
     x, y = pyautogui.position()
-    
-    # Устанавливаем позицию окна рядом с курсором
     root.geometry(f"+{x}+{y}")
-    
-    # Принудительно поднимаем окно и устанавливаем фокус
+    root.deiconify()
+    root.attributes("-topmost", True)
     root.lift()
     root.focus_force()
-    
-    # Добавляем небольшую задержку для гарантии фокуса
-    root.after(100, lambda: root.focus_force())
-    
-    app = StringListApp(root, previous_window)
-    
-    # Устанавливаем фокус на поле ввода через небольшую задержку
-    root.after(100, lambda: app.entry.focus())
-    
-    root.mainloop()
+    app.entry.focus()
 
-keyboard.add_hotkey("ctrl+alt+s", show_window)
-keyboard.wait("esc")
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.withdraw()
+    app = StringListApp(root)
+    keyboard.add_hotkey("ctrl+alt+s", show_window)
+    root.mainloop()
