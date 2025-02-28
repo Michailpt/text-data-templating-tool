@@ -55,10 +55,20 @@ class StringListApp:
         )
         self.menu_bar.add_cascade(label="Поиск", menu=self.search_menu)
         
+        # Меню Вид
+        self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.always_on_top_var = tk.BooleanVar(value=True)
+        self.view_menu.add_checkbutton(
+            label="Поверх всех окон", 
+            variable=self.always_on_top_var,
+            command=self.toggle_always_on_top
+        )
+        self.menu_bar.add_cascade(label="Вид", menu=self.view_menu)
+
         # Меню Справка
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.help_menu.add_command(label="Шпаргалка по Regex", command=self.show_regex_help)
-        self.help_menu.add_command(label="О программе", command=self.show_about)  # Добавлена новая кнопка
+        self.help_menu.add_command(label="О программе", command=self.show_about)
         self.menu_bar.add_cascade(label="Справка", menu=self.help_menu)
         
         root.config(menu=self.menu_bar)
@@ -150,7 +160,6 @@ $    - Конец строки
 \\t   - Табуляция
 \\n   - Новая строка
 \\r   - Возврат каретки
-
 Примеры:
 ^\\d+$       - Только цифры
 ^[а-яё]+$    - Только русские буквы
@@ -277,13 +286,17 @@ $    - Конец строки
             self.update_list()
             self.entry.focus()
 
+    def toggle_always_on_top(self) -> None:
+        """Переключает режим 'Поверх всех окон'"""
+        self.root.attributes("-topmost", self.always_on_top_var.get())
+
 def show_window() -> None:
     """Показывает окно приложения"""
     app.previous_window = gw.getActiveWindow()
     x, y = pyautogui.position()
     root.geometry(f"+{x}+{y}")
     root.deiconify()
-    root.attributes("-topmost", True)
+    root.attributes("-topmost", app.always_on_top_var.get())
     root.lift()
     root.focus_force()
     app.entry.focus()
