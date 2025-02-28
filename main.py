@@ -1,11 +1,12 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import ttk, scrolledtext, messagebox
 import keyboard
 import pyperclip
 import time
 import pygetwindow as gw
 import pyautogui
 import re
+import json
 from typing import Optional, List
 
 global_strings: List[str] = ["Пример строки 1", "Пример строки 2", "Пример строки 3"]
@@ -17,6 +18,8 @@ class StringListApp:
         self.root.geometry("400x300")
         self.root.attributes("-topmost", True)
         self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
+        self.data_file = "strings.json"
+        self.strings = self.load_strings()
         
         # Меню
         self.menu_bar = tk.Menu(root)
@@ -74,7 +77,6 @@ class StringListApp:
         root.config(menu=self.menu_bar)
 
         # Основные элементы интерфейса
-        self.strings: List[str] = global_strings
         self.filtered_strings: List[str] = self.strings.copy()
         self.previous_window: Optional[gw.Win32Window] = None
         self.editing_index: Optional[int] = None
@@ -112,15 +114,38 @@ class StringListApp:
         self.listbox.bind("<Return>", self.insert_string)
         self.listbox.bind("<Double-Button-1>", self.insert_string)
         self.root.bind("<Escape>", self.hide_window)
+        self.listbox.bind("<Button-3>", self.show_context_menu)
+
+    def load_strings(self) -> List[str]:
+        try:
+            with open(self.data_file, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return global_strings.copy()
+
+    def save_strings(self):
+        with open(self.data_file, 'w') as f:
+            json.dump(self.strings, f, ensure_ascii=False, indent=2)
+
+    def show_context_menu(self, event):
+        menu = tk.Menu(self.root, tearoff=0)
+        menu.add_command(label="Копировать", command=self.copy_to_clipboard)
+        menu.add_command(label="Удалить", command=self.delete_string)
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def copy_to_clipboard(self):
+        if self.listbox.curselection():
+            index = self.listbox.curselection()[0]
+            selected = self.filtered_strings[index]
+            pyperclip.copy(selected)
 
     def show_about(self):
-        """Показывает окно 'О программе'"""
         about_window = tk.Toplevel(self.root)
         about_window.title("О программе")
         about_window.geometry("300x200")
         
         info_text = ("String List\n\n"
-                    "Версия 1.0\n"
+                    "Версия 1.1\n"
                     "Автор: Ваше имя\n"
                     "Лицензия: MIT\n\n"
                     "Программа для быстрой вставки\n"
@@ -130,42 +155,8 @@ class StringListApp:
         ttk.Button(about_window, text="OK", command=about_window.destroy).pack(pady=10)
 
     def show_regex_help(self):
-        """Показывает окно с шпаргалкой по регулярным выражениям"""
-        help_text = """Шпаргалка по регулярным выражениям
-
-Основные синтаксисы:
-.    - Любой символ
-^    - Начало строки
-$    - Конец строки
-\\d   - Цифра [0-9]
-\\D   - Не цифра
-\\w   - Буква, цифра или подчёркивание [a-zA-Z0-9_]
-\\W   - Не буква/цифра/подчёркивание
-\\s   - Пробельный символ
-\\S   - Не пробельный символ
-[ ]  - Диапазон или набор символов
-( )  - Группа символов
-|    - Логическое ИЛИ
-
-Квантификаторы:
-*     - 0 или более повторений
-+     - 1 или более повторений
-?     - 0 или 1 повторение
-{n}   - Ровно n повторений
-{n,}  - n или более повторений
-{n,m} - От n до m повторений
-
-Специальные символы:
-\\    - Экранирование специальных символов
-\\t   - Табуляция
-\\n   - Новая строка
-\\r   - Возврат каретки
-Примеры:
-^\\d+$       - Только цифры
-^[а-яё]+$    - Только русские буквы
-\\b\\w{3}\\b  - Слова из 3 букв
-^\\d{4}-\\d{2}-\\d{2}$ - Дата в формате ГГГГ-ММ-ДД"""
-
+        help_text = """Шпаргалка по регулярным выражениям..."""
+        
         help_window = tk.Toplevel(self.root)
         help_window.title("Справка по регулярным выражениям")
         help_window.geometry("500x400")
@@ -188,12 +179,17 @@ $    - Конец строки
                 self.filtered_strings = self.strings.copy()
         else:
             case_sensitive = self.case_sensitive_var.get()
-            compare_text = filter_text.lower() if not case_sensitive else filter_text
-            compare_strings = [s.lower() for s in self.strings] if not case_sensitive else self.strings
+            compare_text = filter_text if case_sensitive else filter_text.lower()
+            compare_strings = self.strings if case_sensitive else [s.lower() for s in self.strings]
 
             if self.exact_match_var.get():
-                self.filtered_strings = [s for s, cs in zip(self.strings, compare_strings) if compare_text == cs]
+                # Поиск точного вхождения всей фразы
+                self.filtered_strings = [
+                    s for s, cs in zip(self.strings, compare_strings)
+                    if compare_text in cs
+                ]
             else:
+                # Обычный поиск по всем словам
                 filter_words = compare_text.split()
                 self.filtered_strings = [
                     s for s, cs in zip(self.strings, compare_strings)
@@ -236,6 +232,7 @@ $    - Конец строки
         new_string = self.filter_var.get().strip()
         if new_string and new_string not in self.strings:
             self.strings.append(new_string)
+            self.save_strings()
             self.update_list()
             self.filter_var.set("")
             self.entry.focus()
@@ -259,6 +256,7 @@ $    - Конец строки
             new_string = self.filter_var.get().strip()
             if new_string and new_string not in self.strings:
                 self.strings[self.editing_index] = new_string
+                self.save_strings()
             self.cleanup_edit()
 
     def cancel_edit(self) -> None:
@@ -283,6 +281,7 @@ $    - Конец строки
         if selected:
             selected_string = self.filtered_strings[selected[0]]
             self.strings.remove(selected_string)
+            self.save_strings()
             self.update_list()
             self.entry.focus()
 
@@ -294,11 +293,11 @@ def show_window() -> None:
     """Показывает окно приложения"""
     app.previous_window = gw.getActiveWindow()
     x, y = pyautogui.position()
-    root.geometry(f"+{x}+{y}")
-    root.deiconify()
-    root.attributes("-topmost", app.always_on_top_var.get())
-    root.lift()
-    root.focus_force()
+    app.root.geometry(f"+{x}+{y}")
+    app.root.deiconify()
+    app.root.attributes("-topmost", app.always_on_top_var.get())
+    app.root.lift()
+    app.root.focus_force()
     app.entry.focus()
 
 if __name__ == "__main__":
