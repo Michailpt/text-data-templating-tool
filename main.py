@@ -18,6 +18,13 @@ class StringListApp:
         self.root.attributes("-topmost", True)
         self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
         
+        # Создаем меню
+        self.menu_bar = tk.Menu(root)
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.file_menu.add_command(label="Выход", command=root.destroy)
+        self.menu_bar.add_cascade(label="Файл", menu=self.file_menu)
+        root.config(menu=self.menu_bar)
+
         self.strings: List[str] = global_strings
         self.filtered_strings: List[str] = self.strings.copy()
         self.previous_window: Optional[Win32Window] = None
@@ -57,9 +64,6 @@ class StringListApp:
 
         self.delete_button = ttk.Button(self.button_frame, text="Удалить", command=self.delete_string)
         self.delete_button.pack(side=tk.LEFT, padx=5)
-
-        self.exit_button = ttk.Button(self.button_frame, text="Выход", command=self.root.destroy)
-        self.exit_button.pack(side=tk.RIGHT, padx=5)
 
         self.ok_button = ttk.Button(self.button_frame, text="OK", command=self.save_edit)
         self.cancel_button = ttk.Button(self.button_frame, text="Отмена", command=self.cancel_edit)
@@ -101,7 +105,6 @@ class StringListApp:
             self.add_button.pack_forget()
             self.edit_button.pack_forget()
             self.delete_button.pack_forget()
-            self.exit_button.pack_forget()
             self.ok_button.pack(side=tk.LEFT, padx=5)
             self.cancel_button.pack(side=tk.LEFT, padx=5)
             self.editing_index = self.strings.index(self.filtered_strings[selected[0]])
@@ -124,7 +127,6 @@ class StringListApp:
         self.add_button.pack(side=tk.LEFT, padx=5)
         self.edit_button.pack(side=tk.LEFT, padx=5)
         self.delete_button.pack(side=tk.LEFT, padx=5)
-        self.exit_button.pack(side=tk.RIGHT, padx=5)
         self.filter_var.set("")
         self.update_list()
         self.editing_index = None
