@@ -58,6 +58,7 @@ class StringListApp:
         # Меню Справка
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.help_menu.add_command(label="Шпаргалка по Regex", command=self.show_regex_help)
+        self.help_menu.add_command(label="О программе", command=self.show_about)  # Добавлена новая кнопка
         self.menu_bar.add_cascade(label="Справка", menu=self.help_menu)
         
         root.config(menu=self.menu_bar)
@@ -101,6 +102,22 @@ class StringListApp:
         self.listbox.bind("<Return>", self.insert_string)
         self.listbox.bind("<Double-Button-1>", self.insert_string)
         self.root.bind("<Escape>", self.hide_window)
+
+    def show_about(self):
+        """Показывает окно 'О программе'"""
+        about_window = tk.Toplevel(self.root)
+        about_window.title("О программе")
+        about_window.geometry("300x200")
+        
+        info_text = ("String List\n\n"
+                    "Версия 1.0\n"
+                    "Автор: Ваше имя\n"
+                    "Лицензия: MIT\n\n"
+                    "Программа для быстрой вставки\n"
+                    "часто используемых строковых шаблонов")
+        
+        ttk.Label(about_window, text=info_text, justify=tk.LEFT, padding=10).pack(expand=True)
+        ttk.Button(about_window, text="OK", command=about_window.destroy).pack(pady=10)
 
     def show_regex_help(self):
         """Показывает окно с шпаргалкой по регулярным выражениям"""
