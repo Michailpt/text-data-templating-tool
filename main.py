@@ -18,11 +18,30 @@ class StringListApp:
         self.root.attributes("-topmost", True)
         self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
         
-        # Создаем меню
+        # Создание меню
         self.menu_bar = tk.Menu(root)
+        
+        # Меню Файл
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.file_menu.add_command(label="Выход", command=root.destroy)
         self.menu_bar.add_cascade(label="Файл", menu=self.file_menu)
+        
+        # Меню Поиск
+        self.search_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.exact_match_var = tk.BooleanVar()
+        self.case_sensitive_var = tk.BooleanVar()
+        self.search_menu.add_checkbutton(
+            label="Точное совпадение", 
+            variable=self.exact_match_var,
+            command=self.update_list
+        )
+        self.search_menu.add_checkbutton(
+            label="Учитывать регистр", 
+            variable=self.case_sensitive_var,
+            command=self.update_list
+        )
+        self.menu_bar.add_cascade(label="Поиск", menu=self.search_menu)
+        
         root.config(menu=self.menu_bar)
 
         self.strings: List[str] = global_strings
@@ -31,23 +50,13 @@ class StringListApp:
         self.editing_index: Optional[int] = None
 
         self.filter_var = tk.StringVar()
-        self.filter_var.trace("w", self.update_list)
+        self.filter_var.trace("w", lambda *args: self.update_list())
         
-        self.exact_match_var = tk.BooleanVar()
-        self.exact_match_var.trace("w", self.update_list)
-
         input_frame = ttk.Frame(root)
         input_frame.pack(pady=10, padx=10, fill=tk.X)
         
         self.entry = ttk.Entry(input_frame, textvariable=self.filter_var)
         self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        
-        self.exact_match = ttk.Checkbutton(
-            input_frame, 
-            text="Точное совпадение", 
-            variable=self.exact_match_var
-        )
-        self.exact_match.pack(side=tk.RIGHT, padx=(10, 0))
 
         self.listbox = tk.Listbox(root)
         self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -73,18 +82,25 @@ class StringListApp:
         self.root.bind("<Escape>", self.hide_window)
 
     def update_list(self, *args: tk.Event) -> None:
-        filter_text = self.filter_var.get().lower()
+        filter_text = self.filter_var.get()
+        case_sensitive = self.case_sensitive_var.get()
         
+        if not case_sensitive:
+            filter_text = filter_text.lower()
+            compare_strings = [s.lower() for s in self.strings]
+        else:
+            compare_strings = self.strings.copy()
+
         if self.exact_match_var.get():
             self.filtered_strings = [
-                s for s in self.strings 
-                if filter_text in s.lower()
+                s for s, cs in zip(self.strings, compare_strings) 
+                if filter_text in cs
             ]
         else:
             filter_words = [word for word in filter_text.split() if word]
             self.filtered_strings = [
-                s for s in self.strings
-                if all(word in s.lower() for word in filter_words)
+                s for s, cs in zip(self.strings, compare_strings)
+                if all(word in cs for word in filter_words)
             ]
             
         self.listbox.delete(0, tk.END)
