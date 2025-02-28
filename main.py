@@ -16,7 +16,7 @@ class StringListApp:
         self.root.title("String List")
         self.root.geometry("400x300")
         self.root.attributes("-topmost", True)
-        self.root.protocol("WM_DELETE_WINDOW", self.hide_window)  # Изменение здесь
+        self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
         
         self.strings: List[str] = global_strings
         self.filtered_strings: List[str] = self.strings.copy()
@@ -58,6 +58,9 @@ class StringListApp:
         self.delete_button = ttk.Button(self.button_frame, text="Удалить", command=self.delete_string)
         self.delete_button.pack(side=tk.LEFT, padx=5)
 
+        self.exit_button = ttk.Button(self.button_frame, text="Выход", command=self.root.destroy)
+        self.exit_button.pack(side=tk.RIGHT, padx=5)
+
         self.ok_button = ttk.Button(self.button_frame, text="OK", command=self.save_edit)
         self.cancel_button = ttk.Button(self.button_frame, text="Отмена", command=self.cancel_edit)
 
@@ -98,6 +101,7 @@ class StringListApp:
             self.add_button.pack_forget()
             self.edit_button.pack_forget()
             self.delete_button.pack_forget()
+            self.exit_button.pack_forget()
             self.ok_button.pack(side=tk.LEFT, padx=5)
             self.cancel_button.pack(side=tk.LEFT, padx=5)
             self.editing_index = self.strings.index(self.filtered_strings[selected[0]])
@@ -120,6 +124,7 @@ class StringListApp:
         self.add_button.pack(side=tk.LEFT, padx=5)
         self.edit_button.pack(side=tk.LEFT, padx=5)
         self.delete_button.pack(side=tk.LEFT, padx=5)
+        self.exit_button.pack(side=tk.RIGHT, padx=5)
         self.filter_var.set("")
         self.update_list()
         self.editing_index = None
