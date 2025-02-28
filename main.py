@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox
+from tkinter import ttk, scrolledtext
 import keyboard
 import pyperclip
 import time
@@ -14,11 +14,11 @@ class StringListApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("String List")
-        self.root.geometry("400x350")
+        self.root.geometry("400x300")
         self.root.attributes("-topmost", True)
         self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
         
-        # Создание меню
+        # Меню
         self.menu_bar = tk.Menu(root)
         
         # Меню Файл
@@ -57,11 +57,7 @@ class StringListApp:
         
         # Меню Справка
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.help_menu.add_command(label="О программе", command=self.show_about)
-        self.help_menu.add_command(
-            label="Описание регулярных выражений", 
-            command=self.show_regex_help
-        )
+        self.help_menu.add_command(label="Шпаргалка по Regex", command=self.show_regex_help)
         self.menu_bar.add_cascade(label="Справка", menu=self.help_menu)
         
         root.config(menu=self.menu_bar)
@@ -75,21 +71,11 @@ class StringListApp:
         self.filter_var = tk.StringVar()
         self.filter_var.trace("w", lambda *args: self.update_list())
         
-        # Фрейм ввода с кнопкой справки
         input_frame = ttk.Frame(root)
         input_frame.pack(pady=10, padx=10, fill=tk.X)
         
         self.entry = ttk.Entry(input_frame, textvariable=self.filter_var)
         self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        
-        # Кнопка справки по регулярным выражениям
-        self.regex_help_btn = ttk.Button(
-            input_frame, 
-            text="?", 
-            width=2, 
-            command=self.show_regex_help
-        )
-        self.regex_help_btn.pack(side=tk.LEFT, padx=5)
 
         self.listbox = tk.Listbox(root)
         self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -116,21 +102,9 @@ class StringListApp:
         self.listbox.bind("<Double-Button-1>", self.insert_string)
         self.root.bind("<Escape>", self.hide_window)
 
-    def show_about(self):
-        """Показывает окно 'О программе'"""
-        about_text = """String List App
-Версия 2.1
-
-Программа для быстрого доступа 
-к часто используемым строкам.
-Поддержка регулярных выражений.
-
-Разработано в 2024 году"""
-        messagebox.showinfo("О программе", about_text)
-
     def show_regex_help(self):
-        """Показывает окно с описанием регулярных выражений"""
-        help_text = """Описание регулярных выражений
+        """Показывает окно с шпаргалкой по регулярным выражениям"""
+        help_text = """Шпаргалка по регулярным выражениям
 
 Основные синтаксисы:
 .    - Любой символ
@@ -138,7 +112,7 @@ class StringListApp:
 $    - Конец строки
 \\d   - Цифра [0-9]
 \\D   - Не цифра
-\\w   - Буква, цифра или подчёркивание
+\\w   - Буква, цифра или подчёркивание [a-zA-Z0-9_]
 \\W   - Не буква/цифра/подчёркивание
 \\s   - Пробельный символ
 \\S   - Не пробельный символ
@@ -154,14 +128,20 @@ $    - Конец строки
 {n,}  - n или более повторений
 {n,m} - От n до m повторений
 
-Примеры использования:
+Специальные символы:
+\\    - Экранирование специальных символов
+\\t   - Табуляция
+\\n   - Новая строка
+\\r   - Возврат каретки
+
+Примеры:
 ^\\d+$       - Только цифры
 ^[а-яё]+$    - Только русские буквы
-\\b\\w{3}\\b  - Слова из 3 символов
-\\d{3}-\\d{2}-\\d{2} - Номер в формате 123-45-67"""
+\\b\\w{3}\\b  - Слова из 3 букв
+^\\d{4}-\\d{2}-\\d{2}$ - Дата в формате ГГГГ-ММ-ДД"""
         
         help_window = tk.Toplevel(self.root)
-        help_window.title("Регулярные выражения")
+        help_window.title("Справка по регулярным выражениям")
         help_window.geometry("500x400")
         
         text_area = scrolledtext.ScrolledText(help_window, wrap=tk.WORD)
@@ -174,6 +154,7 @@ $    - Конец строки
         filter_text = self.filter_var.get()
         
         if self.regex_pattern_var.get():
+            # Поиск по регулярному выражению
             try:
                 flags = 0 if self.case_sensitive_var.get() else re.IGNORECASE
                 pattern = re.compile(filter_text, flags)
@@ -181,6 +162,7 @@ $    - Конец строки
             except re.error:
                 self.filtered_strings = self.strings.copy()
         else:
+            # Обычный поиск
             case_sensitive = self.case_sensitive_var.get()
             compare_text = filter_text.lower() if not case_sensitive else filter_text
             compare_strings = [s.lower() for s in self.strings] if not case_sensitive else self.strings
