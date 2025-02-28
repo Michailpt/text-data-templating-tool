@@ -30,6 +30,8 @@ class StringListApp:
         self.search_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.exact_match_var = tk.BooleanVar()
         self.case_sensitive_var = tk.BooleanVar()
+        self.keep_search_var = tk.BooleanVar()
+        
         self.search_menu.add_checkbutton(
             label="Точное совпадение", 
             variable=self.exact_match_var,
@@ -39,6 +41,10 @@ class StringListApp:
             label="Учитывать регистр", 
             variable=self.case_sensitive_var,
             command=self.update_list
+        )
+        self.search_menu.add_checkbutton(
+            label="Сохранять условия поиска", 
+            variable=self.keep_search_var
         )
         self.menu_bar.add_cascade(label="Поиск", menu=self.search_menu)
         
@@ -86,18 +92,19 @@ class StringListApp:
         case_sensitive = self.case_sensitive_var.get()
         
         if not case_sensitive:
-            filter_text = filter_text.lower()
+            filter_text_lower = filter_text.lower()
             compare_strings = [s.lower() for s in self.strings]
         else:
+            filter_text_lower = filter_text
             compare_strings = self.strings.copy()
 
         if self.exact_match_var.get():
             self.filtered_strings = [
                 s for s, cs in zip(self.strings, compare_strings) 
-                if filter_text in cs
+                if filter_text_lower in cs
             ]
         else:
-            filter_words = [word for word in filter_text.split() if word]
+            filter_words = [word for word in filter_text_lower.split() if word]
             self.filtered_strings = [
                 s for s, cs in zip(self.strings, compare_strings)
                 if all(word in cs for word in filter_words)
@@ -171,6 +178,9 @@ class StringListApp:
                     print(f"Ошибка активации окна: {e}")
 
     def hide_window(self, event: Optional[tk.Event] = None) -> None:
+        if not self.keep_search_var.get():
+            self.filter_var.set("")
+            self.update_list()
         self.root.withdraw()
         if self.previous_window:
             try:
