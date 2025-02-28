@@ -1,11 +1,11 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, scrolledtext
 import keyboard
 import pyperclip
 import time
 import pygetwindow as gw
-from pygetwindow import Win32Window
 import pyautogui
+import re
 from typing import Optional, List
 
 global_strings: List[str] = ["Пример строки 1", "Пример строки 2", "Пример строки 3"]
@@ -18,7 +18,7 @@ class StringListApp:
         self.root.attributes("-topmost", True)
         self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
         
-        # Создание меню
+        # Меню
         self.menu_bar = tk.Menu(root)
         
         # Меню Файл
@@ -31,6 +31,7 @@ class StringListApp:
         self.exact_match_var = tk.BooleanVar()
         self.case_sensitive_var = tk.BooleanVar()
         self.keep_search_var = tk.BooleanVar()
+        self.regex_pattern_var = tk.BooleanVar()
         
         self.search_menu.add_checkbutton(
             label="Точное совпадение", 
@@ -46,13 +47,25 @@ class StringListApp:
             label="Сохранять условия поиска", 
             variable=self.keep_search_var
         )
+        self.search_menu.add_separator()
+        self.search_menu.add_checkbutton(
+            label="Режим регулярных выражений", 
+            variable=self.regex_pattern_var,
+            command=self.update_list
+        )
         self.menu_bar.add_cascade(label="Поиск", menu=self.search_menu)
+        
+        # Меню Справка
+        self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.help_menu.add_command(label="Шпаргалка по Regex", command=self.show_regex_help)
+        self.menu_bar.add_cascade(label="Справка", menu=self.help_menu)
         
         root.config(menu=self.menu_bar)
 
+        # Основные элементы интерфейса
         self.strings: List[str] = global_strings
         self.filtered_strings: List[str] = self.strings.copy()
-        self.previous_window: Optional[Win32Window] = None
+        self.previous_window: Optional[gw.Win32Window] = None
         self.editing_index: Optional[int] = None
 
         self.filter_var = tk.StringVar()
@@ -68,6 +81,7 @@ class StringListApp:
         self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         self.update_list()
 
+        # Кнопки управления
         self.button_frame = ttk.Frame(root)
         self.button_frame.pack(pady=10)
 
@@ -83,38 +97,91 @@ class StringListApp:
         self.ok_button = ttk.Button(self.button_frame, text="OK", command=self.save_edit)
         self.cancel_button = ttk.Button(self.button_frame, text="Отмена", command=self.cancel_edit)
 
+        # Привязка событий
         self.listbox.bind("<Return>", self.insert_string)
         self.listbox.bind("<Double-Button-1>", self.insert_string)
         self.root.bind("<Escape>", self.hide_window)
 
-    def update_list(self, *args: tk.Event) -> None:
-        filter_text = self.filter_var.get()
-        case_sensitive = self.case_sensitive_var.get()
-        
-        if not case_sensitive:
-            filter_text_lower = filter_text.lower()
-            compare_strings = [s.lower() for s in self.strings]
-        else:
-            filter_text_lower = filter_text
-            compare_strings = self.strings.copy()
+    def show_regex_help(self):
+        """Показывает окно с шпаргалкой по регулярным выражениям"""
+        help_text = """Шпаргалка по регулярным выражениям
 
-        if self.exact_match_var.get():
-            self.filtered_strings = [
-                s for s, cs in zip(self.strings, compare_strings) 
-                if filter_text_lower in cs
-            ]
+Основные синтаксисы:
+.    - Любой символ
+^    - Начало строки
+$    - Конец строки
+\\d   - Цифра [0-9]
+\\D   - Не цифра
+\\w   - Буква, цифра или подчёркивание [a-zA-Z0-9_]
+\\W   - Не буква/цифра/подчёркивание
+\\s   - Пробельный символ
+\\S   - Не пробельный символ
+[ ]  - Диапазон или набор символов
+( )  - Группа символов
+|    - Логическое ИЛИ
+
+Квантификаторы:
+*     - 0 или более повторений
++     - 1 или более повторений
+?     - 0 или 1 повторение
+{n}   - Ровно n повторений
+{n,}  - n или более повторений
+{n,m} - От n до m повторений
+
+Специальные символы:
+\\    - Экранирование специальных символов
+\\t   - Табуляция
+\\n   - Новая строка
+\\r   - Возврат каретки
+
+Примеры:
+^\\d+$       - Только цифры
+^[а-яё]+$    - Только русские буквы
+\\b\\w{3}\\b  - Слова из 3 букв
+^\\d{4}-\\d{2}-\\d{2}$ - Дата в формате ГГГГ-ММ-ДД"""
+        
+        help_window = tk.Toplevel(self.root)
+        help_window.title("Справка по регулярным выражениям")
+        help_window.geometry("500x400")
+        
+        text_area = scrolledtext.ScrolledText(help_window, wrap=tk.WORD)
+        text_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        text_area.insert(tk.INSERT, help_text)
+        text_area.configure(state='disabled')
+
+    def update_list(self, *args: tk.Event) -> None:
+        """Обновляет список строк согласно параметрам поиска"""
+        filter_text = self.filter_var.get()
+        
+        if self.regex_pattern_var.get():
+            # Поиск по регулярному выражению
+            try:
+                flags = 0 if self.case_sensitive_var.get() else re.IGNORECASE
+                pattern = re.compile(filter_text, flags)
+                self.filtered_strings = [s for s in self.strings if pattern.search(s)]
+            except re.error:
+                self.filtered_strings = self.strings.copy()
         else:
-            filter_words = [word for word in filter_text_lower.split() if word]
-            self.filtered_strings = [
-                s for s, cs in zip(self.strings, compare_strings)
-                if all(word in cs for word in filter_words)
-            ]
+            # Обычный поиск
+            case_sensitive = self.case_sensitive_var.get()
+            compare_text = filter_text.lower() if not case_sensitive else filter_text
+            compare_strings = [s.lower() for s in self.strings] if not case_sensitive else self.strings
+
+            if self.exact_match_var.get():
+                self.filtered_strings = [s for s, cs in zip(self.strings, compare_strings) if compare_text in cs]
+            else:
+                filter_words = compare_text.split()
+                self.filtered_strings = [
+                    s for s, cs in zip(self.strings, compare_strings)
+                    if all(word in cs for word in filter_words)
+                ]
             
         self.listbox.delete(0, tk.END)
         for s in self.filtered_strings:
             self.listbox.insert(tk.END, s)
 
     def add_string(self) -> None:
+        """Добавляет новую строку в список"""
         new_string = self.filter_var.get().strip()
         if new_string and new_string not in self.strings:
             self.strings.append(new_string)
@@ -123,6 +190,7 @@ class StringListApp:
             self.entry.focus()
 
     def edit_string(self) -> None:
+        """Начинает редактирование выбранной строки"""
         selected = self.listbox.curselection()
         if selected:
             self.add_button.pack_forget()
@@ -135,6 +203,7 @@ class StringListApp:
             self.entry.focus()
 
     def save_edit(self) -> None:
+        """Сохраняет отредактированную строку"""
         if self.editing_index is not None:
             new_string = self.filter_var.get().strip()
             if new_string and new_string not in self.strings:
@@ -142,9 +211,11 @@ class StringListApp:
             self.cleanup_edit()
 
     def cancel_edit(self) -> None:
+        """Отменяет редактирование"""
         self.cleanup_edit()
 
     def cleanup_edit(self) -> None:
+        """Восстанавливает интерфейс после редактирования"""
         self.ok_button.pack_forget()
         self.cancel_button.pack_forget()
         self.add_button.pack(side=tk.LEFT, padx=5)
@@ -156,6 +227,7 @@ class StringListApp:
         self.entry.focus()
 
     def delete_string(self) -> None:
+        """Удаляет выбранную строку"""
         selected = self.listbox.curselection()
         if selected:
             selected_string = self.filtered_strings[selected[0]]
@@ -164,6 +236,7 @@ class StringListApp:
             self.entry.focus()
 
     def insert_string(self, event: Optional[tk.Event] = None) -> None:
+        """Вставляет выбранную строку в активное окно"""
         selected = self.listbox.curselection()
         if selected:
             selected_string = self.filtered_strings[selected[0]]
@@ -178,6 +251,7 @@ class StringListApp:
                     print(f"Ошибка активации окна: {e}")
 
     def hide_window(self, event: Optional[tk.Event] = None) -> None:
+        """Скрывает окно приложения"""
         if not self.keep_search_var.get():
             self.filter_var.set("")
             self.update_list()
@@ -189,6 +263,7 @@ class StringListApp:
                 print(f"Ошибка активации предыдущего окна: {e}")
 
 def show_window() -> None:
+    """Показывает окно приложения"""
     app.previous_window = gw.getActiveWindow()
     x, y = pyautogui.position()
     root.geometry(f"+{x}+{y}")
