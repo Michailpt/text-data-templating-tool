@@ -24,9 +24,22 @@ class StringListApp:
 
         self.filter_var = tk.StringVar()
         self.filter_var.trace("w", self.update_list)
+        
+        self.exact_match_var = tk.BooleanVar()
+        self.exact_match_var.trace("w", self.update_list)
 
-        self.entry = ttk.Entry(root, textvariable=self.filter_var)
-        self.entry.pack(pady=10, padx=10, fill=tk.X)
+        input_frame = ttk.Frame(root)
+        input_frame.pack(pady=10, padx=10, fill=tk.X)
+        
+        self.entry = ttk.Entry(input_frame, textvariable=self.filter_var)
+        self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        self.exact_match = ttk.Checkbutton(
+            input_frame, 
+            text="Точное совпадение", 
+            variable=self.exact_match_var
+        )
+        self.exact_match.pack(side=tk.RIGHT, padx=(10, 0))
 
         self.listbox = tk.Listbox(root)
         self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -53,11 +66,21 @@ class StringListApp:
 
     def update_list(self, *args: tk.Event) -> None:
         filter_text = self.filter_var.get().lower()
-        filter_words = [word for word in filter_text.split() if word]
-        self.filtered_strings = [
-            s for s in self.strings
-            if all(word in s.lower() for word in filter_words)
-        ]
+        
+        if self.exact_match_var.get():
+            # Режим точного совпадения (поиск подстроки)
+            self.filtered_strings = [
+                s for s in self.strings 
+                if filter_text in s.lower()
+            ]
+        else:
+            # Режим поиска по всем словам (логическое И)
+            filter_words = [word for word in filter_text.split() if word]
+            self.filtered_strings = [
+                s for s in self.strings
+                if all(word in s.lower() for word in filter_words)
+            ]
+            
         self.listbox.delete(0, tk.END)
         for s in self.filtered_strings:
             self.listbox.insert(tk.END, s)
