@@ -53,7 +53,11 @@ class StringListApp:
 
     def update_list(self, *args: tk.Event) -> None:
         filter_text = self.filter_var.get().lower()
-        self.filtered_strings = [s for s in self.strings if filter_text in s.lower()]
+        filter_words = [word for word in filter_text.split() if word]
+        self.filtered_strings = [
+            s for s in self.strings
+            if all(word in s.lower() for word in filter_words)
+        ]
         self.listbox.delete(0, tk.END)
         for s in self.filtered_strings:
             self.listbox.insert(tk.END, s)
