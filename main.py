@@ -139,7 +139,7 @@ $    - Конец строки
 ^[а-яё]+$    - Только русские буквы
 \\b\\w{3}\\b  - Слова из 3 букв
 ^\\d{4}-\\d{2}-\\d{2}$ - Дата в формате ГГГГ-ММ-ДД"""
-        
+
         help_window = tk.Toplevel(self.root)
         help_window.title("Справка по регулярным выражениям")
         help_window.geometry("500x400")
@@ -154,7 +154,6 @@ $    - Конец строки
         filter_text = self.filter_var.get()
         
         if self.regex_pattern_var.get():
-            # Поиск по регулярному выражению
             try:
                 flags = 0 if self.case_sensitive_var.get() else re.IGNORECASE
                 pattern = re.compile(filter_text, flags)
@@ -162,13 +161,12 @@ $    - Конец строки
             except re.error:
                 self.filtered_strings = self.strings.copy()
         else:
-            # Обычный поиск
             case_sensitive = self.case_sensitive_var.get()
             compare_text = filter_text.lower() if not case_sensitive else filter_text
             compare_strings = [s.lower() for s in self.strings] if not case_sensitive else self.strings
 
             if self.exact_match_var.get():
-                self.filtered_strings = [s for s, cs in zip(self.strings, compare_strings) if compare_text in cs]
+                self.filtered_strings = [s for s, cs in zip(self.strings, compare_strings) if compare_text == cs]
             else:
                 filter_words = compare_text.split()
                 self.filtered_strings = [
@@ -179,6 +177,33 @@ $    - Конец строки
         self.listbox.delete(0, tk.END)
         for s in self.filtered_strings:
             self.listbox.insert(tk.END, s)
+
+    def insert_string(self, event: Optional[tk.Event] = None) -> None:
+        """Вставляет выбранную строку в активное окно"""
+        selected = self.listbox.curselection()
+        if selected:
+            selected_string = self.filtered_strings[selected[0]]
+            pyperclip.copy(selected_string)
+            self.hide_window()
+            time.sleep(0.1)
+            if self.previous_window:
+                try:
+                    self.previous_window.activate()
+                    keyboard.press_and_release("ctrl+v")
+                except Exception as e:
+                    print(f"Ошибка активации окна: {e}")
+
+    def hide_window(self, event: Optional[tk.Event] = None) -> None:
+        """Скрывает окно приложения"""
+        if not self.keep_search_var.get():
+            self.filter_var.set("")
+            self.update_list()
+        self.root.withdraw()
+        if self.previous_window:
+            try:
+                self.previous_window.activate()
+            except Exception as e:
+                print(f"Ошибка активации предыдущего окна: {e}")
 
     def add_string(self) -> None:
         """Добавляет новую строку в список"""
@@ -234,33 +259,6 @@ $    - Конец строки
             self.strings.remove(selected_string)
             self.update_list()
             self.entry.focus()
-
-    def insert_string(self, event: Optional[tk.Event] = None) -> None:
-        """Вставляет выбранную строку в активное окно"""
-        selected = self.listbox.curselection()
-        if selected:
-            selected_string = self.filtered_strings[selected[0]]
-            pyperclip.copy(selected_string)
-            self.hide_window()
-            time.sleep(0.1)
-            if self.previous_window:
-                try:
-                    self.previous_window.activate()
-                    keyboard.press_and_release("ctrl+v")
-                except Exception as e:
-                    print(f"Ошибка активации окна: {e}")
-
-    def hide_window(self, event: Optional[tk.Event] = None) -> None:
-        """Скрывает окно приложения"""
-        if not self.keep_search_var.get():
-            self.filter_var.set("")
-            self.update_list()
-        self.root.withdraw()
-        if self.previous_window:
-            try:
-                self.previous_window.activate()
-            except Exception as e:
-                print(f"Ошибка активации предыдущего окна: {e}")
 
 def show_window() -> None:
     """Показывает окно приложения"""
