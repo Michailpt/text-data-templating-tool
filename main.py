@@ -16,6 +16,7 @@ class StringListApp:
         self.root.title("String List")
         self.root.geometry("400x300")
         self.root.attributes("-topmost", True)
+        self.root.protocol("WM_DELETE_WINDOW", self.hide_window)  # Изменение здесь
         
         self.strings: List[str] = global_strings
         self.filtered_strings: List[str] = self.strings.copy()
@@ -68,13 +69,11 @@ class StringListApp:
         filter_text = self.filter_var.get().lower()
         
         if self.exact_match_var.get():
-            # Режим точного совпадения (поиск подстроки)
             self.filtered_strings = [
                 s for s in self.strings 
                 if filter_text in s.lower()
             ]
         else:
-            # Режим поиска по всем словам (логическое И)
             filter_words = [word for word in filter_text.split() if word]
             self.filtered_strings = [
                 s for s in self.strings
