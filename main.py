@@ -19,7 +19,22 @@ class StringListApp:
         self.root.attributes("-topmost", True)
         self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
         self.data_file = "strings.json"
+        self.settings_file = "settings.json"
         self.strings = self.load_strings()
+        
+        # Определение всех переменных настроек
+        self.always_on_top_var = tk.BooleanVar(value=True)
+        self.save_size_var = tk.BooleanVar(value=False)
+        self.exact_match_var = tk.BooleanVar(value=False)
+        self.case_sensitive_var = tk.BooleanVar(value=False)
+        self.keep_search_var = tk.BooleanVar(value=False)
+        self.regex_pattern_var = tk.BooleanVar(value=False)
+        
+        # Поле поиска без трассировки пока
+        self.filter_var = tk.StringVar()
+        
+        # Загрузка всех настроек
+        self.load_settings()
         
         # Меню
         self.menu_bar = tk.Menu(root)
@@ -31,11 +46,6 @@ class StringListApp:
         
         # Меню Поиск
         self.search_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.exact_match_var = tk.BooleanVar()
-        self.case_sensitive_var = tk.BooleanVar()
-        self.keep_search_var = tk.BooleanVar()
-        self.regex_pattern_var = tk.BooleanVar()
-        
         self.search_menu.add_checkbutton(
             label="Фраза целиком", 
             variable=self.exact_match_var,
@@ -48,7 +58,8 @@ class StringListApp:
         )
         self.search_menu.add_checkbutton(
             label="Сохранять условия поиска", 
-            variable=self.keep_search_var
+            variable=self.keep_search_var,
+            command=self.save_settings
         )
         self.search_menu.add_separator()
         self.search_menu.add_checkbutton(
@@ -60,11 +71,15 @@ class StringListApp:
         
         # Меню Вид
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.always_on_top_var = tk.BooleanVar(value=True)
         self.view_menu.add_checkbutton(
             label="Поверх всех окон", 
             variable=self.always_on_top_var,
             command=self.toggle_always_on_top
+        )
+        self.view_menu.add_checkbutton(
+            label="Сохранять размер окна", 
+            variable=self.save_size_var,
+            command=self.toggle_save_size
         )
         self.menu_bar.add_cascade(label="Вид", menu=self.view_menu)
 
@@ -81,9 +96,6 @@ class StringListApp:
         self.previous_window: Optional[gw.Win32Window] = None
         self.editing_index: Optional[int] = None
 
-        self.filter_var = tk.StringVar()
-        self.filter_var.trace("w", lambda *args: self.update_list())
-        
         input_frame = ttk.Frame(root)
         input_frame.pack(pady=10, padx=10, fill=tk.X)
         
@@ -92,7 +104,10 @@ class StringListApp:
 
         self.listbox = tk.Listbox(root)
         self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        self.update_list()
+        
+        # Теперь, когда listbox создан, можно добавить трассировку
+        self.filter_var.trace("w", lambda *args: self.update_list())
+        self.update_list()  # Начальное обновление списка
 
         # Кнопки управления
         self.button_frame = ttk.Frame(root)
@@ -115,6 +130,7 @@ class StringListApp:
         self.listbox.bind("<Double-Button-1>", self.insert_string)
         self.root.bind("<Escape>", self.hide_window)
         self.listbox.bind("<Button-3>", self.show_context_menu)
+        self.root.bind("<Configure>", self.save_window_size)
 
     def load_strings(self) -> List[str]:
         try:
@@ -123,9 +139,59 @@ class StringListApp:
         except FileNotFoundError:
             return global_strings.copy()
 
+    def load_settings(self) -> None:
+        """Загружает все сохраненные настройки"""
+        try:
+            with open(self.settings_file, 'r') as f:
+                settings = json.load(f)
+                if "size" in settings and settings.get("save_size", False):
+                    width = settings["size"]["width"]
+                    height = settings["size"]["height"]
+                    self.root.geometry(f"{width}x{height}")
+                self.always_on_top_var.set(settings.get("always_on_top", True))
+                self.save_size_var.set(settings.get("save_size", False))
+                self.exact_match_var.set(settings.get("exact_match", False))
+                self.case_sensitive_var.set(settings.get("case_sensitive", False))
+                self.keep_search_var.set(settings.get("keep_search", False))
+                self.regex_pattern_var.set(settings.get("regex_pattern", False))
+                if settings.get("keep_search", False):
+                    self.filter_var.set(settings.get("search_text", ""))
+                self.root.attributes("-topmost", self.always_on_top_var.get())
+        except FileNotFoundError:
+            pass
+
+    def save_settings(self) -> None:
+        """Сохраняет все текущие настройки"""
+        settings = {
+            "always_on_top": self.always_on_top_var.get(),
+            "save_size": self.save_size_var.get(),
+            "exact_match": self.exact_match_var.get(),
+            "case_sensitive": self.case_sensitive_var.get(),
+            "keep_search": self.keep_search_var.get(),
+            "regex_pattern": self.regex_pattern_var.get(),
+            "search_text": self.filter_var.get() if self.keep_search_var.get() else "",
+            "size": {
+                "width": self.root.winfo_width(),
+                "height": self.root.winfo_height()
+            }
+        }
+        with open(self.settings_file, 'w') as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
+
     def save_strings(self):
         with open(self.data_file, 'w') as f:
             json.dump(self.strings, f, ensure_ascii=False, indent=2)
+
+    def save_window_size(self, event: tk.Event) -> None:
+        if self.save_size_var.get():
+            self.save_settings()
+
+    def toggle_save_size(self) -> None:
+        self.save_settings()
+
+    def toggle_always_on_top(self) -> None:
+        self.root.attributes("-topmost", self.always_on_top_var.get())
+        self.save_settings()
 
     def show_context_menu(self, event):
         menu = tk.Menu(self.root, tearoff=0)
@@ -167,8 +233,8 @@ class StringListApp:
         text_area.configure(state='disabled')
 
     def update_list(self, *args: tk.Event) -> None:
-        """Обновляет список строк согласно параметрам поиска"""
         filter_text = self.filter_var.get()
+        self.save_settings()
         
         if self.regex_pattern_var.get():
             try:
@@ -183,13 +249,11 @@ class StringListApp:
             compare_strings = self.strings if case_sensitive else [s.lower() for s in self.strings]
 
             if self.exact_match_var.get():
-                # Поиск точного вхождения всей фразы
                 self.filtered_strings = [
                     s for s, cs in zip(self.strings, compare_strings)
                     if compare_text in cs
                 ]
             else:
-                # Обычный поиск по всем словам
                 filter_words = compare_text.split()
                 self.filtered_strings = [
                     s for s, cs in zip(self.strings, compare_strings)
@@ -201,7 +265,6 @@ class StringListApp:
             self.listbox.insert(tk.END, s)
 
     def insert_string(self, event: Optional[tk.Event] = None) -> None:
-        """Вставляет выбранную строку в активное окно"""
         selected = self.listbox.curselection()
         if selected:
             selected_string = self.filtered_strings[selected[0]]
@@ -216,7 +279,7 @@ class StringListApp:
                     print(f"Ошибка активации окна: {e}")
 
     def hide_window(self, event: Optional[tk.Event] = None) -> None:
-        """Скрывает окно приложения"""
+        self.save_settings()
         if not self.keep_search_var.get():
             self.filter_var.set("")
             self.update_list()
@@ -228,7 +291,6 @@ class StringListApp:
                 print(f"Ошибка активации предыдущего окна: {e}")
 
     def add_string(self) -> None:
-        """Добавляет новую строку в список"""
         new_string = self.filter_var.get().strip()
         if new_string and new_string not in self.strings:
             self.strings.append(new_string)
@@ -238,7 +300,6 @@ class StringListApp:
             self.entry.focus()
 
     def edit_string(self) -> None:
-        """Начинает редактирование выбранной строки"""
         selected = self.listbox.curselection()
         if selected:
             self.add_button.pack_forget()
@@ -251,7 +312,6 @@ class StringListApp:
             self.entry.focus()
 
     def save_edit(self) -> None:
-        """Сохраняет отредактированную строку"""
         if self.editing_index is not None:
             new_string = self.filter_var.get().strip()
             if new_string and new_string not in self.strings:
@@ -260,11 +320,9 @@ class StringListApp:
             self.cleanup_edit()
 
     def cancel_edit(self) -> None:
-        """Отменяет редактирование"""
         self.cleanup_edit()
 
     def cleanup_edit(self) -> None:
-        """Восстанавливает интерфейс после редактирования"""
         self.ok_button.pack_forget()
         self.cancel_button.pack_forget()
         self.add_button.pack(side=tk.LEFT, padx=5)
@@ -276,7 +334,6 @@ class StringListApp:
         self.entry.focus()
 
     def delete_string(self) -> None:
-        """Удаляет выбранную строку"""
         selected = self.listbox.curselection()
         if selected:
             selected_string = self.filtered_strings[selected[0]]
@@ -285,12 +342,7 @@ class StringListApp:
             self.update_list()
             self.entry.focus()
 
-    def toggle_always_on_top(self) -> None:
-        """Переключает режим 'Поверх всех окон'"""
-        self.root.attributes("-topmost", self.always_on_top_var.get())
-
 def show_window() -> None:
-    """Показывает окно приложения"""
     app.previous_window = gw.getActiveWindow()
     x, y = pyautogui.position()
     app.root.geometry(f"+{x}+{y}")

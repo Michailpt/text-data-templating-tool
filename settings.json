@@ -1,0 +1,13 @@
+{
+  "always_on_top": false,
+  "save_size": true,
+  "exact_match": false,
+  "case_sensitive": false,
+  "keep_search": true,
+  "regex_pattern": false,
+  "search_text": "при ",
+  "size": {
+    "width": 692,
+    "height": 300
+  }
+}
