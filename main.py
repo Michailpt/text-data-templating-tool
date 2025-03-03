@@ -8,6 +8,10 @@ import pyautogui
 import re
 import json
 from typing import Optional, List
+import pystray
+from pystray import MenuItem as item
+from PIL import Image
+import threading
 
 global_strings: List[str] = ["Пример строки 1", "Пример строки 2", "Пример строки 3"]
 
@@ -21,6 +25,7 @@ class StringListApp:
         self.data_file = "strings.json"
         self.settings_file = "settings.json"
         self.strings = self.load_strings()
+        self.tray_icon = None  # Инициализируем tray_icon как None заранее
         
         # Определение всех переменных настроек
         self.always_on_top_var = tk.BooleanVar(value=True)
@@ -41,46 +46,22 @@ class StringListApp:
         
         # Меню Файл
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.file_menu.add_command(label="Выход", command=root.destroy)
+        self.file_menu.add_command(label="Выход", command=self.quit_app)
         self.menu_bar.add_cascade(label="Файл", menu=self.file_menu)
         
         # Меню Поиск
         self.search_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.search_menu.add_checkbutton(
-            label="Фраза целиком", 
-            variable=self.exact_match_var,
-            command=self.update_list
-        )
-        self.search_menu.add_checkbutton(
-            label="Учитывать регистр", 
-            variable=self.case_sensitive_var,
-            command=self.update_list
-        )
-        self.search_menu.add_checkbutton(
-            label="Сохранять условия поиска", 
-            variable=self.keep_search_var,
-            command=self.save_settings
-        )
+        self.search_menu.add_checkbutton(label="Фраза целиком", variable=self.exact_match_var, command=self.update_list)
+        self.search_menu.add_checkbutton(label="Учитывать регистр", variable=self.case_sensitive_var, command=self.update_list)
+        self.search_menu.add_checkbutton(label="Сохранять условия поиска", variable=self.keep_search_var, command=self.save_settings)
         self.search_menu.add_separator()
-        self.search_menu.add_checkbutton(
-            label="Режим регулярных выражений", 
-            variable=self.regex_pattern_var,
-            command=self.update_list
-        )
+        self.search_menu.add_checkbutton(label="Режим регулярных выражений", variable=self.regex_pattern_var, command=self.update_list)
         self.menu_bar.add_cascade(label="Поиск", menu=self.search_menu)
         
         # Меню Вид
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.view_menu.add_checkbutton(
-            label="Поверх всех окон", 
-            variable=self.always_on_top_var,
-            command=self.toggle_always_on_top
-        )
-        self.view_menu.add_checkbutton(
-            label="Сохранять размер окна", 
-            variable=self.save_size_var,
-            command=self.toggle_save_size
-        )
+        self.view_menu.add_checkbutton(label="Поверх всех окон", variable=self.always_on_top_var, command=self.toggle_always_on_top)
+        self.view_menu.add_checkbutton(label="Сохранять размер окна", variable=self.save_size_var, command=self.toggle_save_size)
         self.menu_bar.add_cascade(label="Вид", menu=self.view_menu)
 
         # Меню Справка
@@ -140,7 +121,6 @@ class StringListApp:
             return global_strings.copy()
 
     def load_settings(self) -> None:
-        """Загружает все сохраненные настройки"""
         try:
             with open(self.settings_file, 'r') as f:
                 settings = json.load(f)
@@ -161,7 +141,6 @@ class StringListApp:
             pass
 
     def save_settings(self) -> None:
-        """Сохраняет все текущие настройки"""
         settings = {
             "always_on_top": self.always_on_top_var.get(),
             "save_size": self.save_size_var.get(),
@@ -209,24 +188,16 @@ class StringListApp:
         about_window = tk.Toplevel(self.root)
         about_window.title("О программе")
         about_window.geometry("300x200")
-        
-        info_text = ("String List\n\n"
-                    "Версия 1.1\n"
-                    "Автор: Ваше имя\n"
-                    "Лицензия: MIT\n\n"
-                    "Программа для быстрой вставки\n"
-                    "часто используемых строковых шаблонов")
-        
+        info_text = ("String List\n\nВерсия 1.1\nАвтор: Ваше имя\nЛицензия: MIT\n\n"
+                     "Программа для быстрой вставки\nчасто используемых строковых шаблонов")
         ttk.Label(about_window, text=info_text, justify=tk.LEFT, padding=10).pack(expand=True)
         ttk.Button(about_window, text="OK", command=about_window.destroy).pack(pady=10)
 
     def show_regex_help(self):
         help_text = """Шпаргалка по регулярным выражениям..."""
-        
         help_window = tk.Toplevel(self.root)
         help_window.title("Справка по регулярным выражениям")
         help_window.geometry("500x400")
-        
         text_area = scrolledtext.ScrolledText(help_window, wrap=tk.WORD)
         text_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         text_area.insert(tk.INSERT, help_text)
@@ -235,7 +206,6 @@ class StringListApp:
     def update_list(self, *args: tk.Event) -> None:
         filter_text = self.filter_var.get()
         self.save_settings()
-        
         if self.regex_pattern_var.get():
             try:
                 flags = 0 if self.case_sensitive_var.get() else re.IGNORECASE
@@ -247,19 +217,11 @@ class StringListApp:
             case_sensitive = self.case_sensitive_var.get()
             compare_text = filter_text if case_sensitive else filter_text.lower()
             compare_strings = self.strings if case_sensitive else [s.lower() for s in self.strings]
-
             if self.exact_match_var.get():
-                self.filtered_strings = [
-                    s for s, cs in zip(self.strings, compare_strings)
-                    if compare_text in cs
-                ]
+                self.filtered_strings = [s for s, cs in zip(self.strings, compare_strings) if compare_text in cs]
             else:
                 filter_words = compare_text.split()
-                self.filtered_strings = [
-                    s for s, cs in zip(self.strings, compare_strings)
-                    if all(word in cs for word in filter_words)
-                ]
-            
+                self.filtered_strings = [s for s, cs in zip(self.strings, compare_strings) if all(word in cs for word in filter_words)]
         self.listbox.delete(0, tk.END)
         for s in self.filtered_strings:
             self.listbox.insert(tk.END, s)
@@ -283,12 +245,7 @@ class StringListApp:
         if not self.keep_search_var.get():
             self.filter_var.set("")
             self.update_list()
-        self.root.withdraw()
-        if self.previous_window:
-            try:
-                self.previous_window.activate()
-            except Exception as e:
-                print(f"Ошибка активации предыдущего окна: {e}")
+        self.root.withdraw()  # Скрываем окно в трей
 
     def add_string(self) -> None:
         new_string = self.filter_var.get().strip()
@@ -342,7 +299,14 @@ class StringListApp:
             self.update_list()
             self.entry.focus()
 
-def show_window() -> None:
+    def quit_app(self):
+        """Полное завершение приложения"""
+        self.save_settings()
+        if self.tray_icon:  # Проверяем, существует ли tray_icon перед остановкой
+            self.tray_icon.stop()
+        self.root.quit()
+
+def show_window(icon=None, item=None) -> None:
     app.previous_window = gw.getActiveWindow()
     x, y = pyautogui.position()
     app.root.geometry(f"+{x}+{y}")
@@ -352,9 +316,27 @@ def show_window() -> None:
     app.root.focus_force()
     app.entry.focus()
 
+def quit_app(icon, item):
+    app.quit_app()
+
+def setup_tray(app_instance):
+    # Создаём простую иконку (можно заменить на свою)
+    image = Image.new('RGB', (64, 64), color=(73, 109, 137))  # Цветная заглушка
+    # Если у вас есть своя иконка, раскомментируйте следующую строку и укажите путь:
+    # image = Image.open("path/to/your/icon.png")
+    
+    menu = (item('Показать', show_window), item('Выход', quit_app))
+    app_instance.tray_icon = pystray.Icon("string_list", image, "String List", menu)
+    app_instance.tray_icon.run()
+
 if __name__ == "__main__":
     root = tk.Tk()
-    root.withdraw()
+    root.withdraw()  # Скрываем окно при запуске
     app = StringListApp(root)
+    
+    # Запускаем трей в отдельном потоке, передавая экземпляр app
+    tray_thread = threading.Thread(target=setup_tray, args=(app,), daemon=True)
+    tray_thread.start()
+    
     keyboard.add_hotkey("ctrl+alt+s", show_window)
     root.mainloop()
