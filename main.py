@@ -37,7 +37,7 @@ class StringListApp:
         self.regex_pattern_var = tk.BooleanVar()
         
         self.search_menu.add_checkbutton(
-            label="Точное совпадение", 
+            label="Фраза целиком", 
             variable=self.exact_match_var,
             command=self.update_list
         )
